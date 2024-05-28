@@ -1,0 +1,39 @@
+---
+AWX:
+  enabled: true
+  name: awx
+  spec:
+    hostname: awx.cgerber.local
+    admin_user: admin
+    admin_password_secret: awx-admin-password
+
+    ingress_type: ingress
+    ingress_hosts:
+      - hostname: awx.cgerber.local
+        tls_secret: awx-secret-tls
+    bundle_cacert_secret: awx-custom-certs
+
+    postgres_configuration_secret: awx-postgres-configuration
+    postgres_storage_class: awx-postgres-volume
+    postgres_storage_requirements:
+      requests:
+        storage: 8Gi
+
+    projects_persistence: true
+    projects_existing_claim: awx-projects-claim
+
+    web_replicas: 1
+    task_replicas: 1
+
+    web_resource_requirements: {}
+    task_resource_requirements: {}
+    ee_resource_requirements: {}
+    init_container_resource_requirements: {}
+    postgres_resource_requirements: {}
+    redis_resource_requirements: {}
+    rsyslog_resource_requirements: {}
+
+    extra_settings:
+      - setting: TOWER_URL_BASE
+        value: >-
+          "http://awx.cgerber.local"

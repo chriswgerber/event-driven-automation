@@ -1,0 +1,9 @@
+# kubectl get secret awx-actions -n awx -o jsonpath={".data.token"} | base64 -d
+---
+apiVersion: v1
+type: kubernetes.io/service-account-token
+kind: Secret
+metadata:
+  name: awx-actions
+  annotations:
+    kubernetes.io/service-account.name: "awx-actions"
