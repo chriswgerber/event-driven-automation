@@ -17,6 +17,7 @@
     - `helm repo add awx-operator ...`
 4. K8s Dashboard
     - `helm upgrade --install kubernetes-dashboard kubernetes-dashboard/kubernetes-dashboard --create-namespace --namespace kubernetes-dashboard`
+    - `kubectl -n kubernetes-dashboard port-forward svc/kubernetes-dashboard-kong-proxy 8443:443`
 5. AWX
     - Postgres data source directories
     - Certificate
