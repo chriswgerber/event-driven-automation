@@ -1,0 +1,17 @@
+#!/bin/zsh
+
+export MQTTUI_BROKER="mqtt://localhost:31883"
+export MQTTUI_TOPIC="server-events"
+
+# Action: ScaleUp / ScaleDown
+MESSAGE_TEMPLATE='{"service_name": "%s", "action": "%s", "message": "%s"}'
+
+function format_msg() {
+  printf "${MESSAGE_TEMPLATE}" $1 $2 $3
+}
+
+event_msg="$(format_msg $1 $2 $3)"
+
+printf 'Sending Event: %s\n\n' "${event_msg}"
+
+mqttui publish "${MQTTUI_TOPIC}" "${event_msg}"

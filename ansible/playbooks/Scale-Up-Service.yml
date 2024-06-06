@@ -1,0 +1,108 @@
+---
+
+- name: Scale K8s Service
+  hosts: localhost
+
+  vars:
+    webapp_name: "{{ ansible_eda.event.service_name | default('example-webapp') }}"
+    webapp_namespace: webapp
+    slack_webhook_url:
+    slack_message_channel_id: 'C075B3LN475' # #General
+    slack_message_text_default: 'Scaling Up Webservice via EDA'
+    slack_message_text: >-
+      {{ ansible_eda.event.message | default(slack_message_text_default) }}
+
+    # ScaleUp or ScaleDown
+    service_action: "{{ ansible_eda.event.action | default('None') }}"
+    service_replica_count:
+    service_replica_target: 1
+
+  tasks:
+
+    - name: Search for matching Deployments
+      k8s_info:
+        api_version: v1
+        kind: Deployment
+        name: "{{ webapp_name }}"
+        namespace: "{{ webapp_namespace }}"
+      register: deployment_info
+      delegate_to: localhost
+
+    - name: Show Current Spec
+      ansible.builtin.debug:
+        msg: "{{ deployment_info.resources[0].spec }}"
+
+    - name: Set Replica Count
+      ansible.builtin.set_fact:
+        service_replica_count: "{{ deployment_info.resources[0].spec.replicas | int }}"
+
+    - name: Set Replica Target
+      block:
+        - name: Set Replica Scale Up
+          ansible.builtin.set_fact:
+            service_replica_target: "{{ (service_replica_count | int)  + 1 }}"
+          when: service_action == "ScaleUp"
+
+        - name: Set Replica Scale Down
+          ansible.builtin.set_fact:
+            service_replica_target: "{{ (service_replica_count | int) - 1 }}"
+          when: service_action == "ScaleDown"
+
+        - name: Set Minimum scale target
+          ansible.builtin.set_fact:
+            service_replica_target: "{{ (1 if (service_replica_target | int) < 1 else service_replica_target ) }}"
+
+    - name: Send Slack Message - Starting Scaling
+      ansible.builtin.uri:
+        url: "{{ slack_webhook_url }}"
+        method: POST
+        body_format: json
+        body:
+          channel_id: "{{ slack_message_channel_id }}"
+          message: |
+            Starting: {{ slack_message_text }}
+
+            Service: {{ webapp_namespace }} / {{ webapp_name }}
+            Action: {{ service_action }} {{ service_replica_count | int }} to {{ service_replica_target | int }}
+      delegate_to: localhost
+
+    - name: Run Scaling Tasks
+      block:
+        - name: Scale Up Service
+          kubernetes.core.k8s_scale:
+            api_version: v1
+            kind: Deployment
+            name: "{{ webapp_name }}"
+            namespace: "{{ webapp_namespace }}"
+            replicas: "{{ service_replica_target | int }}"
+            wait_timeout: 60
+          delegate_to: localhost
+
+        - name: Send success notification
+          ansible.builtin.uri:
+            url: "{{ slack_webhook_url }}"
+            method: POST
+            body_format: json
+            body:
+              channel_id: "{{ slack_message_channel_id }}"
+              message: |
+                Completed Successfuly: {{ slack_message_text }}
+
+                Service: {{ webapp_namespace }} / {{ webapp_name }}
+                Target: {{ service_replica_target | int }}
+          delegate_to: localhost
+
+      rescue:
+        - name: Send failure notification
+          ansible.builtin.uri:
+            url: "{{ slack_webhook_url }}"
+            method: POST
+            body_format: json
+            body:
+              channel_id: "{{ slack_message_channel_id }}"
+              message: |
+                Failed To Update: {{ slack_message_text }}
+
+                Service: {{ webapp_namespace }} / {{ webapp_name }}
+                Target: {{ service_replica_target | int }}
+          delegate_to: localhost
